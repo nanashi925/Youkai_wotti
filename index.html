@@ -3,160 +3,607 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>妖怪バトル</title>
+<title>妖怪ウォッチ風バトル ～あの頃の住宅街～</title>
 <style>
-  body { background:#222; color:#fff; font-family:"Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
-         display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; }
-  #game { width:480px; background:linear-gradient(#7ec8e3,#bde8c0 70%,#8a6d3b 70%); border:6px solid #fff;
-          border-radius:12px; padding:16px; box-shadow:0 0 20px #000; }
-  .unit { display:flex; justify-content:space-between; align-items:center; margin:8px 0; }
-  .sprite { font-size:56px; transition:transform .15s; }
-  .shake { transform:translateX(-10px) rotate(-10deg); }
-  .panel { background:rgba(0,0,0,.65); border-radius:8px; padding:8px 12px; min-width:230px; }
-  .hpbar { background:#444; border-radius:6px; height:14px; overflow:hidden; margin-top:4px; }
-  .hpfill { background:linear-gradient(#ffe14d,#f5a623); height:100%; transition:width .3s; }
-  #log { background:rgba(0,0,0,.75); border-radius:8px; min-height:64px; padding:10px; margin-top:12px; font-size:14px; line-height:1.6; }
-  #cmds { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
-  button { background:#ff5a00; color:#fff; border:3px solid #fff; border-radius:24px; padding:10px;
-           font-size:16px; font-weight:bold; cursor:pointer; }
-  button:hover { background:#ff7a30; }
-  button:disabled { background:#888; cursor:default; }
-  #bgmBtn { background:#3478f6; }
+  * { box-sizing:border-box; user-select:none; }
+  body { background:#1b1b2a; font-family:"Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
+         display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; color:#fff; }
+  #console { background:#2c2c3e; border-radius:18px; padding:14px 18px; box-shadow:0 10px 40px #000; }
+  .bezel { background:#111; border-radius:8px; padding:6px; }
+  canvas { display:block; image-rendering:pixelated; }
+  #scene { width:560px; height:315px; background:#87ceeb; border-radius:4px; }
+  #botwrap { margin-top:10px; display:flex; flex-direction:column; align-items:center; }
+  #wheel { width:560px; height:170px; background:#163a5f; border-radius:4px; }
+  #cmds { display:flex; gap:6px; margin-top:8px; width:560px; }
+  button { flex:1; background:linear-gradient(#ff7a30,#ff5a00); color:#fff; border:2px solid #fff;
+           border-radius:18px; padding:8px 4px; font-size:13px; font-weight:bold; cursor:pointer; font-family:inherit; }
+  button:hover { filter:brightness(1.15); }
+  button:disabled { background:#666; filter:none; cursor:default; }
+  button.blue { background:linear-gradient(#5b8def,#3461d1); }
+  #overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none;
+             justify-content:center; align-items:center; flex-direction:column; z-index:10; text-align:center; }
+  #overlay .box { background:#fffbe8; color:#333; border:5px solid #ff5a00; border-radius:14px;
+                  padding:24px 36px; max-width:520px; font-size:16px; line-height:1.9; }
+  #overlay .box h2 { color:#ff5a00; margin:0 0 8px; }
+  #overlay button { flex:none; padding:10px 36px; margin-top:14px; font-size:16px; }
+  #mgArea { position:relative; width:480px; height:240px; background:#222a44; border-radius:12px;
+            border:4px solid #ffd33d; margin-top:12px; overflow:hidden; }
+  .tapTarget { position:absolute; width:56px; height:56px; border-radius:50%; cursor:pointer;
+               background:radial-gradient(circle,#fff 25%,#ffd33d 60%,#ff5a00); border:3px solid #fff;
+               display:flex; align-items:center; justify-content:center; font-weight:bold; color:#c0392b;
+               animation:pop .15s; }
+  @keyframes pop { from { transform:scale(0); } to { transform:scale(1); } }
+  #mashBtn { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:140px; height:140px;
+             border-radius:50%; font-size:20px; background:radial-gradient(circle,#d6b4f0,#8e44ad); border:4px solid #fff; }
+  .cutin { position:fixed; left:0; right:0; top:38%; background:linear-gradient(90deg,transparent,#000d,#000d,transparent);
+           text-align:center; font-size:34px; font-weight:bold; color:#ffd33d; padding:18px 0; z-index:20;
+           text-shadow:2px 2px 0 #c0392b; animation:cutin 1.4s forwards; pointer-events:none; }
+  @keyframes cutin { 0%{transform:translateX(-100%);} 15%{transform:none;} 85%{transform:none;} 100%{transform:translateX(100%);opacity:0;} }
 </style>
 </head>
 <body>
-<div id="game">
-  <div class="unit">
-    <div class="panel">
-      <b id="eName"></b> Lv<span id="eLv"></span>
-      <div class="hpbar"><div class="hpfill" id="eHp"></div></div>
+<div id="console">
+  <div class="bezel"><canvas id="scene" width="480" height="270"></canvas></div>
+  <div id="botwrap">
+    <div class="bezel"><canvas id="wheel" width="480" height="146"></canvas></div>
+    <div id="cmds">
+      <button class="blue" onclick="rotate(-1)">◀ かいてん</button>
+      <button class="blue" onclick="rotate(1)">かいてん ▶</button>
+      <button id="bHiss" onclick="cmdHissatsu()">ひっさつわざ</button>
+      <button id="bHarai" onclick="cmdOharai()">おはらい</button>
+      <button id="bItem" onclick="cmdItem()">おにぎり ×<span id="itemN">5</span></button>
+      <button id="bAim" onclick="cmdAim()">ねらう</button>
+      <button class="blue" id="bBgm" onclick="toggleBgm()">♪BGM</button>
     </div>
-    <div class="sprite" id="eSpr">👻</div>
-  </div>
-  <div class="unit">
-    <div class="sprite" id="aSpr">😼</div>
-    <div class="panel">
-      <b>破怪</b> Lv99
-      <div class="hpbar"><div class="hpfill" id="aHp"></div></div>
-    </div>
-  </div>
-  <div id="log">ようかいが あらわれた！</div>
-  <div id="cmds">
-    <button onclick="act('attack')">たたかう</button>
-    <button onclick="act('skill')">ようじゅつ「やぶれの術」</button>
-    <button onclick="act('soul')">ひっさつわざ「破壊光線」</button>
-    <button id="bgmBtn" onclick="toggleBgm()">♪ BGM ON</button>
   </div>
 </div>
+<div id="overlay"></div>
 
 <script>
-// ---- バトルデータ ----
-const ally = { name:"破怪", lv:99, maxHp:520, hp:520, atk:160 };
-const enemies = [
-  { name:"ネガティブーン", spr:"👻", maxHp:120, atk:18 },
-  { name:"ヒキコウモリ",   spr:"🦇", maxHp:140, atk:22 },
-  { name:"ジミー",         spr:"🌫️", maxHp:100, atk:15 },
-];
-let enemy, busy = false;
-
-function spawn() {
-  const e = enemies[Math.floor(Math.random() * enemies.length)];
-  enemy = { ...e, hp: e.maxHp, lv: 5 };
-  document.getElementById("eName").textContent = enemy.name;
-  document.getElementById("eLv").textContent = enemy.lv;
-  document.getElementById("eSpr").textContent = enemy.spr;
-  ally.hp = ally.maxHp;
-  render();
-  say(`${enemy.name}が あらわれた！`);
+/* ============================================================
+   ドット絵スプライト（全てコード生成のオリジナルピクセルアート）
+   ============================================================ */
+function drawSprite(c, sp, x, y, s, flip) {
+  c.save(); c.translate(x, y);
+  if (flip) { c.scale(-1, 1); c.translate(-sp.map[0].length * s, 0); }
+  sp.map.forEach((row, r) => { for (let i = 0; i < row.length; i++) {
+    const ch = row[i]; if (ch !== "." && sp.pal[ch]) { c.fillStyle = sp.pal[ch]; c.fillRect(i*s, r*s, s, s); }
+  }});
+  c.restore();
 }
 
-function render() {
-  document.getElementById("aHp").style.width = (ally.hp / ally.maxHp * 100) + "%";
-  document.getElementById("eHp").style.width = (enemy.hp / enemy.maxHp * 100) + "%";
-}
-function say(t) { document.getElementById("log").innerHTML = t; }
-function shake(id) {
-  const el = document.getElementById(id);
-  el.classList.add("shake");
-  setTimeout(() => el.classList.remove("shake"), 150);
-}
-const wait = ms => new Promise(r => setTimeout(r, ms));
+const SPR = {};
+// ── 破怪（赤鬼の妖怪・Lv99のエース）──
+SPR.hakai = { pal:{K:"#1a1a1a",S:"#e25b3f",Y:"#f7c948",W:"#fff",T:"#b8860b"}, map:[
+"..KKK....KKK....",
+".KKKKKKKKKKKK...",
+".KYKKKKKKKKYK...",
+".KSSSSSSSSSSK...",
+".SSWKSSSSWKSS...",
+".SSSSSSSSSSSS...",
+".SSKKKKKKKKSS...",
+".SSWKKKKKKWSS...",
+"..SSSSSSSSSS....",
+"..SSSSSSSSSS..T.",
+".SSSSSSSSSSSS.T.",
+".SS.SSSSSS.SST..",
+"..KSKSKSKSKK....",
+"..SS..SS..SS....",
+]};
+// ── ジバニャン（赤い猫又）──
+SPR.jiba = { pal:{A:"#e8443a",W:"#fdf3e0",K:"#222",Y:"#f7c948",P:"#f48fb1",F:"#7fd8f7"}, map:[
+".A...........A..",
+"AAA.........AAA.",
+"AYA.........AYA.",
+".AAAAAAAAAAAAA..",
+".AAAAAAAAAAAAA..",
+".AWKWAAAAAWKWA..",
+".AWWWAAAAAWWWA..",
+".AAWWWWWWWWWAA..",
+".APWWWKKWWWPA...",
+"..AAAAAAAAAAA.F.",
+"..AAAKKKAAAAA.F.",
+".AAAAAAAAAAAAAF.",
+".AA.AAAAAAA.AA..",
+"..AA..AAA..AA...",
+]};
+// ── コマさん（白いこま犬）──
+SPR.koma = { pal:{W:"#fefefe",M:"#69d2c3",P:"#f7b1c9",K:"#222",C:"#7fd8f7"}, map:[
+".W...........W..",
+"WWW.........WWW.",
+"WPW.........WPW.",
+".WWWWWWWWWWWWW..",
+".WMMWWWWWWMMWW..",
+".WKKWWWWWWKKWW..",
+".WWWWWKKWWWWWW..",
+".WWWWKWWKWWWWW..",
+"..WWWWWWWWWWW...",
+"..MWWWWWWWWWM...",
+"..WWWWCCWWWWW...",
+"..WW.WWWWW.WW...",
+"..WW.WWWWW.WW...",
+".WWW..WWW..WWW..",
+]};
+// ── ネガティブーン（紫のしずく型）──
+SPR.nega = { pal:{P:"#9b6bb3",D:"#6e4a85",W:"#e8e8e8",K:"#222"}, map:[
+"......PP........",
+".....PPPP.......",
+"....PPPPPP......",
+"...PPPPPPPP.....",
+"..PPPPPPPPPP....",
+"..PWWPPPPWWP....",
+"..PKWPPPPKWP....",
+".PPPPPPPPPPPP...",
+".PPPDKKKKDPPP...",
+".PPPPPPPPPPPP...",
+"..PPPPPPPPPP....",
+"..PP.PPPP.PP....",
+"...P..PP..P.....",
+]};
+// ── ヒキコウモリ（ふとんにくるまったコウモリ）──
+SPR.hiki = { pal:{B:"#6b5b95",F:"#e8c97a",R:"#c0392b",W:"#fff",K:"#222"}, map:[
+".BB........BB...",
+".BBB......BBB...",
+"..BBBBBBBBBB....",
+"..BWKBBBBWKB....",
+"..BBBKKBBBBB....",
+"..FFFFFFFFFF....",
+".FRRFFRRFFRRF...",
+".FFFFFFFFFFFF...",
+".FRRFFRRFFRRF...",
+"..FFFFFFFFFF....",
+"...FFFFFFFF.....",
+]};
+// ── グレるりん（リーゼントのワル妖怪）──
+SPR.gure = { pal:{K:"#1a1a1a",P:"#b48ec9",W:"#fff"}, map:[
+"...KKKKKK.......",
+".KKKKKKKKKK.....",
+"KKKKKKKKKKKK....",
+"KKK.PPPPPPPP....",
+"....PWKPPWKP....",
+"....PPPPPPPP....",
+"....PPKKKPPP....",
+".....PPPPPP.....",
+"....KKWWKKK.....",
+"...KKKWWKKKK....",
+"...KK.KKK.KK....",
+"...KK....KK.....",
+]};
+// ── ウィスパー（執事ゴースト・ナビ役）──
+SPR.whis = { pal:{W:"#f4f4f4",K:"#222",L:"#9aa5b1"}, map:[
+"....WWWWW.......",
+"...WWWWWWW......",
+"..WWWWWWWWW.....",
+"..WKKWWWKKW.....",
+"..WKKWWWKKW.....",
+"..WWWWWWWWW.....",
+"..WWLLLLLWW.....",
+"...WWWWWWW......",
+"....WWWWW.......",
+".....WWW........",
+"......WW........",
+".......W........",
+]};
+// 色替えバリエーション（ロボ・弟・トゲ）
+const recolor = (base, swap) => ({ map: base.map, pal: Object.assign({}, base.pal, swap) });
+SPR.robo = recolor(SPR.jiba, { A:"#8a97a5", W:"#d7dde3", Y:"#f39c12", F:"#f39c12" });
+SPR.komajiro = recolor(SPR.koma, { W:"#e8c590", M:"#5b8def" });
+SPR.toge = recolor(SPR.jiba, { A:"#b07cc6", Y:"#fff" });
 
-async function act(type) {
-  if (busy) return;
-  busy = true;
-  let dmg, msg;
-  if (type === "attack")     { dmg = ally.atk + rnd(30); msg = `破怪の こうげき！`; }
-  else if (type === "skill") { dmg = ally.atk * 1.5 + rnd(40); msg = `破怪の ようじゅつ「やぶれの術」！`; }
-  else                       { dmg = ally.atk * 2.5 + rnd(60); msg = `ひっさつわざ「破壊光線」！！`; }
-  dmg = Math.floor(dmg);
-  sfx(type);
-  shake("eSpr");
-  enemy.hp = Math.max(0, enemy.hp - dmg);
-  render();
-  say(`${msg}<br>${enemy.name}に ${dmg} のダメージ！`);
-  await wait(900);
-
-  if (enemy.hp <= 0) {
-    say(`${enemy.name}を たおした！🎉<br>けいけんち ${10 + rnd(20)} かくとく！（Lv99なので むいみ）`);
-    await wait(2200);
-    spawn();
-    busy = false;
-    return;
-  }
-  // 敵のターン
-  const edmg = enemy.atk + rnd(10);
-  sfx("hit");
-  shake("aSpr");
-  ally.hp = Math.max(0, ally.hp - edmg);
-  render();
-  say(`${enemy.name}の こうげき！<br>破怪に ${edmg} のダメージ！`);
-  if (ally.hp <= 0) {
-    await wait(900);
-    say(`破怪は たおれてしまった…<br>…なんてことは Lv99には ありえなかった！ぜんかいふく！`);
-    ally.hp = ally.maxHp;
-    render();
-  }
-  busy = false;
-}
-const rnd = n => Math.floor(Math.random() * n);
-
-// ---- BGM / SFX（Web Audio・オリジナルのチップチューン風） ----
-let ctx, bgmOn = false, bgmTimer;
-function audio() { return ctx ||= new (window.AudioContext || window.webkitAudioContext)(); }
-function tone(freq, dur, t0, type = "square", vol = .08) {
+/* ============================================================
+   サウンド（Web Audio・オリジナルのチップチューン）
+   ============================================================ */
+let ACX, bgmOn = false, bgmTimer;
+const audio = () => ACX ||= new (window.AudioContext || window.webkitAudioContext)();
+function tone(f, dur, t0, type = "square", vol = .07) {
   const c = audio(), o = c.createOscillator(), g = c.createGain();
-  o.type = type; o.frequency.value = freq;
-  g.gain.setValueAtTime(vol, t0);
-  g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
-  o.connect(g).connect(c.destination);
-  o.start(t0); o.stop(t0 + dur);
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
+  o.connect(g).connect(c.destination); o.start(t0); o.stop(t0 + dur);
 }
-// ゆるコミカルな和風バトル風ループ（8小節相当）
-const melody = [392,440,392,330, 392,440,523,440, 392,440,392,330, 294,330,392,0,
-                523,494,440,392, 440,494,523,587, 523,494,440,392, 330,294,330,0];
-const bass   = [196,0,147,0, 196,0,147,0, 196,0,147,0, 131,0,165,0,
-                175,0,131,0, 196,0,147,0, 175,0,131,0, 165,0,98,0];
-function playLoop() {
-  const c = audio(), bpm = 150, step = 60 / bpm / 2, t0 = c.currentTime + .05;
-  melody.forEach((f, i) => { if (f) tone(f, step * .9, t0 + i * step, "square", .06); });
-  bass.forEach((f, i)   => { if (f) tone(f, step * .9, t0 + i * step, "triangle", .1); });
-  bgmTimer = setTimeout(playLoop, melody.length * step * 1000);
+// 和風ペンタトニックの軽快なバトル曲（オリジナル作曲）
+const MEL = [294,349,392,440, 392,349,294,0, 349,392,440,523, 440,392,349,0,
+             440,523,587,523, 440,392,349,392, 294,349,392,349, 294,0,220,0];
+const BAS = [147,0,147,0, 175,0,175,0, 196,0,196,0, 175,0,147,0,
+             147,0,147,0, 175,0,175,0, 196,0,196,0, 220,0,110,0];
+function bgmLoop() {
+  const c = audio(), st = 60/152/2, t0 = c.currentTime + .05;
+  MEL.forEach((f,i) => f && tone(f, st*.9, t0+i*st, "square", .05));
+  BAS.forEach((f,i) => f && tone(f, st*.95, t0+i*st, "triangle", .09));
+  for (let i = 0; i < 32; i += 2) tone(1600, .03, t0+i*st, "square", .015);
+  bgmTimer = setTimeout(bgmLoop, 32*st*1000);
 }
 function toggleBgm() {
-  bgmOn = !bgmOn;
-  document.getElementById("bgmBtn").textContent = bgmOn ? "♪ BGM OFF" : "♪ BGM ON";
-  if (bgmOn) { audio().resume(); playLoop(); } else clearTimeout(bgmTimer);
+  bgmOn = !bgmOn; document.getElementById("bBgm").textContent = bgmOn ? "♪停止" : "♪BGM";
+  if (bgmOn) { audio().resume(); bgmLoop(); } else clearTimeout(bgmTimer);
 }
-function sfx(type) {
-  const t = audio().currentTime;
-  if (type === "attack") { tone(880, .1, t); tone(660, .1, t + .05); }
-  else if (type === "skill") { tone(523, .08, t); tone(659, .08, t + .08); tone(784, .15, t + .16); }
-  else if (type === "soul") { for (let i = 0; i < 6; i++) tone(400 + i * 150, .1, t + i * .05, "sawtooth", .05); }
-  else tone(220, .15, t, "sawtooth", .07);
+const SFX = {
+  hit()    { const t=audio().currentTime; tone(660,.08,t); tone(440,.1,t+.05,"square",.05); },
+  hurt()   { const t=audio().currentTime; tone(180,.18,t,"sawtooth",.06); },
+  hiss()   { const t=audio().currentTime; for(let i=0;i<8;i++) tone(300+i*140,.09,t+i*.05,"sawtooth",.05); },
+  rotate() { const t=audio().currentTime; tone(523,.05,t); tone(784,.07,t+.05); },
+  heal()   { const t=audio().currentTime; [523,659,784].forEach((f,i)=>tone(f,.12,t+i*.07,"triangle",.08)); },
+  win()    { const t=audio().currentTime; [392,523,659,784,1046].forEach((f,i)=>tone(f,.18,t+i*.1,"square",.07)); },
+  medal()  { const t=audio().currentTime; [784,988,1175,1568].forEach((f,i)=>tone(f,.15,t+i*.09,"triangle",.08)); },
+  tap()    { tone(880,.06,audio().currentTime); },
+};
+
+/* ============================================================
+   バトルデータ
+   ============================================================ */
+const mkAlly = (name, spr, lv, hp, atk, spd, hissName, tribe) =>
+  ({ name, spr, lv, maxHp:hp, hp, atk, spd, soul:0, cool:rnd(40), inspirited:false, hissName, tribe });
+// チーム6体（先頭3体が前衛）— エースは破怪Lv99
+let team = [
+  mkAlly("破怪",       SPR.hakai,    99, 999, 230, 2.4, "ごうかい大破壊撃", "イサマシ"),
+  mkAlly("ジバニャン", SPR.jiba,     27, 280,  95, 2.8, "ひゃくれつ肉球",   "プリチー"),
+  mkAlly("コマさん",   SPR.koma,     25, 300,  80, 2.2, "ひとだま乱舞",     "プリチー"),
+  mkAlly("ロボニャン", SPR.robo,     30, 360,  90, 1.8, "ガトリング肉球",   "ゴーケツ"),
+  mkAlly("コマじろう", SPR.komajiro, 24, 270,  78, 2.3, "おとだま乱舞",     "プリチー"),
+  mkAlly("トゲニャン", SPR.toge,     26, 250, 100, 2.6, "とげとげ肉球",     "プリチー"),
+];
+const ENEMY_DEX = [
+  { name:"ネガティブーン", spr:SPR.nega, hp:220, atk:34, spd:1.6, tsuki:true,  tsukiName:"ネガティブ" },
+  { name:"ヒキコウモリ",   spr:SPR.hiki, hp:260, atk:28, spd:1.3, tsuki:true,  tsukiName:"ひきこもり" },
+  { name:"グレるりん",     spr:SPR.gure, hp:300, atk:42, spd:1.9, tsuki:false },
+];
+let enemies = [], wave = 1, money = 0, items = 5;
+let paused = true, aimMode = false, targetIdx = -1;
+let popups = [], anims = {}, msg = "", msgT = 0, wheelSpin = 0;
+const rnd = n => Math.floor(Math.random() * n);
+const front = () => team.slice(0, 3);
+
+function spawnWave() {
+  enemies = [];
+  const n = Math.min(2 + rnd(2), 3);
+  const pos = [[330,118],[390,98],[285,96]];
+  for (let i = 0; i < n; i++) {
+    const d = ENEMY_DEX[rnd(ENEMY_DEX.length)];
+    enemies.push({ ...d, lv:5+rnd(6), maxHp:d.hp, hp:d.hp, cool:rnd(50), x:pos[i][0], y:pos[i][1] });
+  }
+  targetIdx = -1;
+  say(`妖怪が あらわれた！（だい${wave}じん）`);
+}
+function say(t) { msg = t; msgT = 240; }
+
+/* ============================================================
+   トップ画面の描画（住宅街の風景＋バトル）
+   ============================================================ */
+const sc = document.getElementById("scene").getContext("2d");
+function drawScene() {
+  // 空と夕方がかった住宅街
+  const g = sc.createLinearGradient(0,0,0,170);
+  g.addColorStop(0,"#8ecae6"); g.addColorStop(1,"#cdeac0");
+  sc.fillStyle = g; sc.fillRect(0,0,480,170);
+  sc.fillStyle = "#fff";
+  [[60,30,26],[150,18,18],[380,40,30],[300,22,16]].forEach(([x,y,r]) => {
+    sc.beginPath(); sc.ellipse(x,y,r,r*.5,0,0,7); sc.fill();
+  });
+  // 遠景の家なみ
+  sc.fillStyle = "#b9c4cf";
+  [[10,110],[80,100],[200,108],[270,98],[410,105]].forEach(([x,y]) => {
+    sc.fillRect(x,y,52,60); sc.fillStyle="#8d99a6";
+    sc.beginPath(); sc.moveTo(x-6,y); sc.lineTo(x+26,y-22); sc.lineTo(x+58,y); sc.fill();
+    sc.fillStyle="#b9c4cf";
+  });
+  // 電柱（住宅街の象徴）
+  sc.fillStyle = "#6d5b4b";
+  sc.fillRect(150,55,6,115); sc.fillRect(132,66,42,5); sc.fillRect(138,78,30,4);
+  sc.strokeStyle = "#444"; sc.beginPath();
+  sc.moveTo(133,66); sc.quadraticCurveTo(40,90,0,84); sc.moveTo(173,66); sc.quadraticCurveTo(330,95,480,80); sc.stroke();
+  // 道路
+  sc.fillStyle = "#9a8f7f"; sc.fillRect(0,170,480,100);
+  sc.fillStyle = "#857a6b"; sc.fillRect(0,170,480,6);
+  sc.fillStyle = "#fff"; for (let x = 0; x < 480; x += 60) sc.fillRect(x+10,215,34,5);
+
+  // ── 敵 ──
+  enemies.forEach((e, i) => {
+    if (e.hp <= 0) return;
+    const a = anims["e"+i] || 0, dx = a > 0 ? -Math.sin(a/8*Math.PI)*22 : 0;
+    drawSprite(sc, e.spr, e.x + dx, e.y + Math.sin(Date.now()/300+i)*3, 4, true);
+    // HPバー＆名前
+    sc.fillStyle = "#000a"; sc.fillRect(e.x, e.y-20, 64, 16);
+    sc.fillStyle = "#fff"; sc.font = "9px sans-serif"; sc.fillText(`${e.name} Lv${e.lv}`, e.x+2, e.y-11);
+    sc.fillStyle = "#400"; sc.fillRect(e.x+2, e.y-8, 60, 3);
+    sc.fillStyle = "#e74c3c"; sc.fillRect(e.x+2, e.y-8, 60*e.hp/e.maxHp, 3);
+    if (i === targetIdx) { // ねらうピン
+      sc.fillStyle = "#ff2222"; sc.beginPath();
+      sc.moveTo(e.x+32, e.y-26); sc.lineTo(e.x+24, e.y-40); sc.lineTo(e.x+40, e.y-40); sc.fill();
+    }
+  });
+  // ── 前衛3体 ──
+  const apos = [[100,128],[44,104],[160,100]];
+  front().forEach((a, i) => {
+    if (a.hp <= 0) return;
+    const an = anims["a"+i] || 0, dx = an > 0 ? Math.sin(an/8*Math.PI)*22 : 0;
+    if (a.inspirited) { // とりつかれオーラ
+      sc.fillStyle = "rgba(155,89,182,.4)";
+      sc.beginPath(); sc.ellipse(apos[i][0]+30, apos[i][1]+30, 38, 42, 0, 0, 7); sc.fill();
+      sc.fillStyle = "#d6b4f0"; sc.font = "bold 10px sans-serif"; sc.fillText("とりつかれ!", apos[i][0]+6, apos[i][1]-24);
+    }
+    drawSprite(sc, a.spr, apos[i][0] + dx, apos[i][1] + Math.sin(Date.now()/350+i)*2, 4);
+    sc.fillStyle = "#060"; sc.fillRect(apos[i][0]+2, apos[i][1]-8, 60, 3);
+    sc.fillStyle = "#2ecc71"; sc.fillRect(apos[i][0]+2, apos[i][1]-8, 60*Math.max(0,a.hp)/a.maxHp, 3);
+  });
+  // ウィスパーがふよふよ
+  drawSprite(sc, SPR.whis, 8, 28 + Math.sin(Date.now()/400)*4, 2);
+
+  // ダメージポップ
+  popups = popups.filter(p => --p.t > 0);
+  popups.forEach(p => {
+    sc.font = "bold 16px sans-serif"; sc.fillStyle = p.col;
+    sc.strokeStyle = "#000"; sc.lineWidth = 3;
+    sc.strokeText(p.txt, p.x, p.y - (30 - p.t)); sc.fillText(p.txt, p.x, p.y - (30 - p.t));
+  });
+  // メッセージ窓
+  if (msgT > 0) {
+    msgT--;
+    sc.fillStyle = "rgba(0,0,30,.8)"; sc.fillRect(8, 238, 464, 26);
+    sc.strokeStyle = "#ffd33d"; sc.strokeRect(8, 238, 464, 26);
+    sc.fillStyle = "#fff"; sc.font = "13px sans-serif"; sc.fillText(msg, 18, 256);
+  }
+  // ウォッチ風ヘッダ
+  sc.fillStyle = "rgba(0,0,0,.55)"; sc.fillRect(0,0,480,16);
+  sc.fillStyle = "#ffd33d"; sc.font = "bold 11px sans-serif";
+  sc.fillText(`だい${wave}じん`, 6, 12);
+  sc.fillStyle = "#fff"; sc.fillText(`おだちん ${money}円`, 390, 12);
+  Object.keys(anims).forEach(k => { if (--anims[k] <= 0) delete anims[k]; });
 }
 
-spawn();
+/* ============================================================
+   下画面：妖怪ホイール（メダル6枚・前衛3体）
+   ============================================================ */
+const wc = document.getElementById("wheel").getContext("2d");
+function drawWheel() {
+  wc.fillStyle = "#163a5f"; wc.fillRect(0,0,480,146);
+  wc.fillStyle = "#0d2a47"; wc.beginPath(); wc.ellipse(240,73,210,62,0,0,7); wc.fill();
+  wc.strokeStyle = "#ffd33d"; wc.lineWidth = 3; wc.stroke();
+  const slots = [-150,-90,-30,30,90,150]; // 上弧3つが前衛
+  team.forEach((m, i) => {
+    const ang = (slots[i] + wheelSpin) * Math.PI/180;
+    const x = 240 + Math.cos(ang)*185, y = 73 + Math.sin(ang)*44;
+    const isFront = i < 3, r = isFront ? 26 : 18;
+    // メダル
+    wc.beginPath(); wc.arc(x, y, r, 0, 7);
+    wc.fillStyle = m.hp <= 0 ? "#555" : (m.inspirited ? "#7d5ba6" : "#f3e2b8"); wc.fill();
+    wc.lineWidth = 3; wc.strokeStyle = m.hp <= 0 ? "#333" : "#c9a227"; wc.stroke();
+    wc.save(); wc.beginPath(); wc.arc(x, y, r-2, 0, 7); wc.clip();
+    const s = isFront ? 2.6 : 1.8;
+    drawSprite(wc, m.spr, x - 8*s, y - 8*s + 2, s);
+    wc.restore();
+    if (isFront) {
+      wc.fillStyle = "#fff"; wc.font = "bold 10px sans-serif"; wc.textAlign = "center";
+      wc.fillText(`${m.name} Lv${m.lv}`, x, y + r + 12);
+      // HPと妖力（ひっさつ）ゲージ
+      wc.fillStyle = "#400"; wc.fillRect(x-24, y+r+16, 48, 4);
+      wc.fillStyle = "#2ecc71"; wc.fillRect(x-24, y+r+16, 48*Math.max(0,m.hp)/m.maxHp, 4);
+      wc.fillStyle = "#330044"; wc.fillRect(x-24, y+r+22, 48, 4);
+      wc.fillStyle = m.soul >= 100 ? "#ffd33d" : "#a569bd"; wc.fillRect(x-24, y+r+22, 48*Math.min(100,m.soul)/100, 4);
+      wc.textAlign = "left";
+      if (m.soul >= 100 && m.hp > 0) {
+        wc.fillStyle = "#ffd33d"; wc.font = "bold 9px sans-serif"; wc.fillText("必殺OK!", x+10, y-r+4);
+      }
+      if (m.inspirited) { wc.fillStyle = "#d6b4f0"; wc.font = "9px sans-serif"; wc.fillText("とりつき", x-24, y-r); }
+    }
+  });
+  wc.fillStyle = "#ffd33d"; wc.font = "bold 11px sans-serif";
+  wc.fillText("ようかいホイール", 8, 14);
+  if (wheelSpin !== 0) wheelSpin += wheelSpin > 0 ? -6 : 6;
+  if (Math.abs(wheelSpin) < 6) wheelSpin = 0;
+}
+
+function rotate(dir) {
+  if (paused) return;
+  if (dir > 0) team.push(team.shift()); else team.unshift(team.pop());
+  wheelSpin = dir * 60; SFX.rotate();
+  say("ホイールを かいてんした！");
+}
+
+/* ============================================================
+   バトル進行（無印方式のオートバトル）
+   ============================================================ */
+function tick() {
+  if (paused) return;
+  const alive = enemies.filter(e => e.hp > 0);
+  // 味方前衛のオート攻撃
+  front().forEach((a, i) => {
+    if (a.hp <= 0) return;
+    a.cool += a.spd * (a.inspirited ? .45 : 1);
+    if (a.cool >= 100 && alive.length) {
+      a.cool = 0;
+      const tgt = (targetIdx >= 0 && enemies[targetIdx]?.hp > 0) ? enemies[targetIdx] : alive[rnd(alive.length)];
+      const jutsu = Math.random() < .25;
+      let dmg = Math.floor((a.atk * (jutsu ? 1.6 : 1) + rnd(20)) * (a.inspirited ? .5 : 1));
+      tgt.hp = Math.max(0, tgt.hp - dmg);
+      a.soul = Math.min(100, a.soul + 14);
+      anims["a"+i] = 8; SFX.hit();
+      popups.push({ x:tgt.x+14, y:tgt.y, txt:dmg, col: jutsu ? "#7fd8f7" : "#ffd33d", t:30 });
+      if (jutsu) say(`${a.name}の ようじゅつ！`);
+      if (tgt.hp <= 0) say(`${tgt.name}を たおした！`);
+    }
+  });
+  // 敵の行動
+  enemies.forEach((e, i) => {
+    if (e.hp <= 0) return;
+    e.cool += e.spd;
+    if (e.cool >= 100) {
+      e.cool = 0;
+      const fr = front().map((a,j)=>[a,j]).filter(([a]) => a.hp > 0);
+      if (!fr.length) return;
+      const [a] = fr[rnd(fr.length)];
+      if (e.tsuki && !a.inspirited && Math.random() < .3) {
+        a.inspirited = true; anims["e"+i] = 8;
+        say(`${e.name}が ${a.name}に とりついた！「${e.tsukiName}」じょうたいだ！`);
+        SFX.hurt();
+      } else {
+        const dmg = e.atk + rnd(12);
+        a.hp = Math.max(0, a.hp - dmg);
+        a.soul = Math.min(100, a.soul + 6);
+        anims["e"+i] = 8; SFX.hurt();
+        const ai = front().indexOf(a), ax = [[100,128],[44,104],[160,100]][ai];
+        popups.push({ x:ax[0]+20, y:ax[1], txt:dmg, col:"#ff6b6b", t:30 });
+        if (a.hp <= 0) say(`${a.name}は ちからつきた…！かいてんで こうたいだ！`);
+      }
+    }
+  });
+  if (alive.length && enemies.every(e => e.hp <= 0)) winBattle();
+  else if (team.every(m => m.hp <= 0)) loseBattle();
+}
+
+/* ============================================================
+   コマンド
+   ============================================================ */
+function cmdHissatsu() {
+  if (paused) return;
+  const a = front().find(m => m.hp > 0 && m.soul >= 100);
+  if (!a) { say("妖力ゲージが たまっていない！（たたかうと たまるぞ）"); return; }
+  paused = true;
+  // タッチミニゲーム：光る玉を5回タップ
+  let got = 0;
+  showOverlay(`<h2>ひっさつわざ！</h2><div>ひかる玉を 5回 タッチせよ！</div><div id="mgArea"></div>`, false);
+  const area = document.getElementById("mgArea");
+  const place = () => {
+    area.innerHTML = "";
+    const t = document.createElement("div");
+    t.className = "tapTarget"; t.textContent = "タッチ!";
+    t.style.left = rnd(400) + "px"; t.style.top = rnd(170) + "px";
+    t.onclick = () => { SFX.tap(); if (++got >= 5) finish(true); else place(); };
+    area.appendChild(t);
+  };
+  const tm = setTimeout(() => finish(false), 4500);
+  const finish = ok => {
+    clearTimeout(tm); hideOverlay();
+    a.soul = 0; SFX.hiss();
+    const cut = document.createElement("div");
+    cut.className = "cutin"; cut.textContent = `${a.hissName}！！`;
+    document.body.appendChild(cut); setTimeout(() => cut.remove(), 1400);
+    setTimeout(() => {
+      const mult = ok ? 3.2 : 2.0;
+      enemies.forEach(e => { if (e.hp > 0) {
+        const dmg = Math.floor(a.atk * mult + rnd(50));
+        e.hp = Math.max(0, e.hp - dmg);
+        popups.push({ x:e.x+10, y:e.y, txt:dmg, col:"#ff9f1a", t:35 });
+      }});
+      say(ok ? `${a.name}の ${a.hissName}！だいせいこう！` : `${a.name}の ${a.hissName}！`);
+      paused = false;
+      if (enemies.every(e => e.hp <= 0)) winBattle();
+    }, 900);
+  };
+  place();
+}
+
+function cmdOharai() {
+  if (paused) return;
+  const a = team.find(m => m.inspirited && m.hp > 0);
+  if (!a) { say("とりつかれている 妖怪はいない！"); return; }
+  paused = true;
+  let taps = 0;
+  showOverlay(`<h2>おはらい！</h2><div>${a.name}に とりついた悪霊を はらえ！<br>5秒いないに 12連打！</div>
+    <div id="mgArea"><button id="mashBtn">連打!<br><span id="mashN">0</span>/12</button></div>`, false);
+  document.getElementById("mashBtn").onclick = () => {
+    SFX.tap();
+    document.getElementById("mashN").textContent = ++taps;
+    if (taps >= 12) finish(true);
+  };
+  const tm = setTimeout(() => finish(false), 5000);
+  const finish = ok => {
+    clearTimeout(tm); hideOverlay(); paused = false;
+    if (ok) { a.inspirited = false; SFX.heal(); say(`おはらい せいこう！${a.name}は 元気をとりもどした！`); }
+    else say(`おはらい しっぱい… まだ とりつかれている！`);
+  };
+}
+
+function cmdItem() {
+  if (paused || items <= 0) return;
+  const fr = front().filter(m => m.hp > 0 && m.hp < m.maxHp);
+  if (!fr.length) { say("いま おにぎりは ひつようなさそうだ。"); return; }
+  const a = fr.sort((x,y) => x.hp/x.maxHp - y.hp/y.maxHp)[0];
+  items--; document.getElementById("itemN").textContent = items;
+  a.hp = Math.min(a.maxHp, a.hp + 250); SFX.heal();
+  say(`${a.name}に「おもち入りおにぎり」をあげた！HPが 250かいふく！`);
+}
+
+function cmdAim() {
+  if (paused) return;
+  aimMode = !aimMode;
+  document.getElementById("bAim").style.filter = aimMode ? "hue-rotate(120deg)" : "";
+  say(aimMode ? "ねらう：うえの画面で 敵をタッチ！" : "ねらうのを やめた。");
+}
+document.getElementById("scene").addEventListener("click", ev => {
+  if (!aimMode) return;
+  const r = ev.target.getBoundingClientRect();
+  const x = (ev.clientX - r.left) * 480 / r.width, y = (ev.clientY - r.top) * 270 / r.height;
+  enemies.forEach((e, i) => {
+    if (e.hp > 0 && x > e.x-6 && x < e.x+70 && y > e.y-24 && y < e.y+60) {
+      targetIdx = i; SFX.tap(); say(`${e.name}に ねらいを さだめた！`);
+      aimMode = false; document.getElementById("bAim").style.filter = "";
+    }
+  });
+});
+
+/* ============================================================
+   勝敗・リザルト
+   ============================================================ */
+function winBattle() {
+  paused = true; SFX.win();
+  const exp = 40 + wave*15 + rnd(30), oda = 80 + wave*25 + rnd(60);
+  money += oda;
+  const friend = Math.random() < .35 ? enemies[rnd(enemies.length)] : null;
+  setTimeout(() => {
+    let html = `<h2>バトルしゅうりょう！</h2>
+      けいけんち <b>${exp}</b> かくとく！（破怪はLv99なので むだづかい）<br>
+      おだちん <b>${oda}円</b> ひろった！`;
+    if (friend) {
+      SFX.medal();
+      html += `<br><br>✨ ${friend.name}が <b>妖怪メダル</b>をさしだしてきた！<br>
+        <b>${friend.name}と ともだちになった！</b>`;
+    }
+    html += `<br><button onclick="nextWave()">つぎのバトルへ ▶</button>`;
+    showOverlay(html);
+  }, 600);
+}
+function nextWave() {
+  hideOverlay(); wave++;
+  team.forEach(m => { if (m.hp > 0) m.hp = Math.min(m.maxHp, m.hp + 60); });
+  spawnWave(); paused = false;
+}
+function loseBattle() {
+  paused = true;
+  showOverlay(`<h2>ぜんめつ…</h2>みんな ちからつきてしまった…<br><br>
+    しかし「うんがい鏡」のちからで 全員ふっかつ！<br>
+    <button onclick="reviveAll()">ふっかつする</button>`);
+}
+function reviveAll() {
+  hideOverlay();
+  team.forEach(m => { m.hp = Math.floor(m.maxHp*.6); m.inspirited = false; m.soul = 50; });
+  SFX.heal(); say("うんがい鏡のちからで ふっかつした！"); paused = false;
+}
+
+const ov = document.getElementById("overlay");
+function showOverlay(html, box = true) {
+  ov.style.display = "flex";
+  ov.innerHTML = box ? `<div class="box">${html}</div>` : `<div class="box">${html}</div>`;
+}
+function hideOverlay() { ov.style.display = "none"; ov.innerHTML = ""; }
+
+/* ============================================================
+   起動
+   ============================================================ */
+showOverlay(`<h2>妖怪ウォッチ風バトル</h2>
+  <div style="font-size:14px">ウィスパー『うひょ～！あれは悪さをする妖怪ですぞ！<br>
+  ようかいホイールで バトル開始であります！』</div>
+  <div style="font-size:12px;color:#888;margin-top:8px">
+  ▶ 前衛3体はオートで戦う ／ ◀▶でホイール回転<br>
+  ▶ 妖力ゲージMAXで「ひっさつわざ」（タッチ連打ミニゲーム）<br>
+  ▶ とりつかれたら「おはらい」で連打！ ／「ねらう」で敵を指定</div>
+  <button onclick="startGame()">バトルスタート！</button>`);
+function startGame() {
+  hideOverlay(); spawnWave(); paused = false;
+  if (!bgmOn) toggleBgm();
+}
+spawnWave(); paused = true;
+setInterval(tick, 100);
+(function raf(){ drawScene(); drawWheel(); requestAnimationFrame(raf); })();
 </script>
 </body>
 </html>
